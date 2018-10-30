@@ -35,6 +35,62 @@
 (require 'parse-time)
 (require 'magit)
 
+;;; Popup
+
+;;;###autoload
+(defun magit-pgp-popup (&optional arg)
+  "Popup console for PGP verification commands."
+  (interactive "P")
+  (magit-invoke-popup 'magit-pgp-popup nil arg))
+
+(defvar magit-pgp-popup
+  '(:man-page "git-verify-commit"
+    :switches ()
+    :options  ()
+    :actions  ((?c "Verify commit signature" magit-pgp-show-commit-signature)
+               (?t "Verify tag signature"    magit-pgp-show-tag-signature))
+    :max-action-columns 1
+    :default-action magit-verify-tag))
+
+(defun magit-pgp-describe-signature (sig)
+  "Describe a `magit-pgp-signature' object."
+  (if sig
+      (progn
+        (setq sig (car sig))
+        (concat
+         (if (oref sig error) "INVALID" "Valid")
+         (when (oref sig sig-expired) ", EXPIRED")
+         " signature from"
+         (when (oref sig key-expired) " EXPIRED")
+         (when (oref sig key-revoked) " REVOKED")
+         " key "
+         (oref sig key-fingerprint)
+         " "
+         (oref sig key-name)
+         " <"
+         (oref sig key-uid)
+         "> ("
+         (oref sig key-comment)
+         ")"))
+    "No signature found."))
+
+;;;###autoload
+(defun magit-pgp-show-commit-signature (id)
+  (interactive (list (or (magit-commit-at-point) "HEAD")))
+  (message
+   (magit-pgp-describe-signature
+    (magit-pgp-read-commit-signatures id))))
+
+;;;###autoload
+(defun magit-pgp-show-tag-signature (id)
+  (interactive (list (magit-tag-at-point)))
+  (when id
+    (message
+     (magit-pgp-describe-signature
+      (magit-pgp-read-tag-signatures id)))))
+
+(magit-define-popup-keys-deferred 'magit-pgp-popup)
+
 ;;; High level interface
 
 (defun magit-pgp-verify-commit (id &optional
